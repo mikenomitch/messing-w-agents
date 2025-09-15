@@ -13,7 +13,10 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls } from "./utils";
 import { tools, executions } from "./tools";
-// import { env } from "cloudflare:workers";
+
+interface Env {
+  BROWSER: Fetcher;
+}
 
 const model = openai("gpt-4o-2024-11-20");
 // Cloudflare AI Gateway
@@ -36,8 +39,9 @@ export class Chat extends AIChatAgent<Env> {
     _options?: { abortSignal?: AbortSignal }
   ) {
     // const mcpConnection = await this.mcp.connect(
-    //   "https://path-to-mcp-server/sse"
+    //   "https://api.githubcopilot.com/mcp/"
     // );
+    // this.addMcpServer(mcpConnection);
 
     // Collect all tools, including MCP tools
     const allTools = {
@@ -60,7 +64,7 @@ export class Chat extends AIChatAgent<Env> {
         // Stream the AI response using GPT-4
         const result = streamText({
           model,
-          system: `You are a helpful assistant that can do various tasks... 
+          system: `You are a helpful assistant that can do various tasks...
 
 ${unstable_getSchedulePrompt({ date: new Date() })}
 
@@ -87,6 +91,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 
     return dataStreamResponse;
   }
+
   async executeTask(description: string, _task: Schedule<string>) {
     await this.saveMessages([
       ...this.messages,

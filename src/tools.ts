@@ -2,6 +2,14 @@
  * Tool definitions for the AI chat agent
  * Tools can either require human confirmation or execute automatically
  */
+import { env } from "cloudflare:workers";
+// import puppeteer from "@cloudflare/puppeteer";
+import * as cheerio from "cheerio";
+
+import sgMail from "@sendgrid/mail";
+
+sgMail.setApiKey(env.SENDGRID_API_KEY);
+
 import { tool } from "ai";
 import { z } from "zod";
 
@@ -109,6 +117,76 @@ const cancelScheduledTask = tool({
   }
 });
 
+const sendEmailToMyself = tool({
+  description: "Send an email",
+  parameters: z.object({
+    subject: z.string().describe("The subject of the email"),
+    body: z.string().describe("The body of the email")
+  }),
+  execute: async ({ subject, body }) => {
+    const msg = {
+      to: "mail@mikenomitch.com", // Change to your recipient
+      from: "mail@mikenomitch.com", // Change to your verified sender
+      subject: subject,
+      text: body
+    };
+
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log("Email sent");
+        return "Email sent successfully";
+      })
+      .catch((error) => {
+        console.error(error);
+        return "Error sending email";
+      });
+  }
+});
+
+// const browseWeb = tool({
+//   description: "Browses a specific website",
+//   parameters: z.object({
+//     url: z.string().describe("The URL of the website to browse")
+//   }),
+//   execute: async ({ url }) => {
+//     const browser = await puppeteer.launch(env.BROWSER);
+//     const page = await browser.newPage();
+//     await page.goto(url);
+
+//     await page.waitForSelector("body");
+//     const bodyContent = await page.$eval(
+//       "body",
+//       (element: any) => element.innerHTML,
+//     );
+
+//     return `Contents of ${url}: ${bodyContent}`;
+//   }
+// });
+
+const getGHIssueStatus = tool({
+  description: "Get the status of a GitHub issue",
+  parameters: z.object({
+    url: z.string().describe("The URL of the GitHub issue")
+  }),
+  execute: async ({ url }) => {
+    // const browser = await puppeteer.launch(env.BROWSER);
+    // const page = await browser.newPage();
+    // await page.goto(url);
+    // await page.waitForSelector('div[class^="StateLabel__StateLabelBase-sc-qthdln-0 jeqXSg HeaderState-module__stateLabel--Na0HJ"]');
+    // const statusText = await page.$eval(
+    //   'div[class^="StateLabel__StateLabelBase-sc-qthdln-0 jeqXSg HeaderState-module__stateLabel--Na0HJ"]',
+    //   (element: any) => element.innerHTML,
+    // );
+
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const statusText = $('span[data-testid="header-state"]').text().trim();
+    return `The issue status is: ${statusText}`
+  }
+});
+
 /**
  * Export all available tools
  * These will be provided to the AI model to describe available capabilities
@@ -118,7 +196,9 @@ export const tools = {
   getLocalTime,
   scheduleTask,
   getScheduledTasks,
-  cancelScheduledTask
+  cancelScheduledTask,
+  getGHIssueStatus,
+  sendEmailToMyself
 };
 
 /**
